@@ -1,0 +1,3 @@
+Number of left and right joins results are the same.
+This is because data has all corresponding relations.
+if some values are missing left and right should have more records than inner join.
