@@ -51,12 +51,13 @@ mongosh "ВАШ_MONGO_URI" --file scripts/02_transform.js
 Для виконання запитів до трансформованої колекції:
 
 mongosh "ВАШ_MONGO_URI" --file queries/part2_queries.js
+mongosh "ВАШ_MONGO_URI" --file queries/part3_aggregations.js
 
 ### 8. Аналіз індексів
 
 Для виконання завдань з індексації:
 
-mongosh "ВАШ_MONGO_URI" --file part4_indexes.js
+mongosh "ВАШ_MONGO_URI" --file queries/part4_indexes.js
 
 Скрипт виконує `explain()` до створення індексів, створює compound indexes і повторно виконує `explain()` для порівняння планів виконання.
 
@@ -165,6 +166,7 @@ $stdDevSamp рахує стандартне відхилення для вибі
 Але результат стане менш надійним статистично, бо жанри з меншою кількістю треків можуть мати випадково завищені або занижені середні значення. Поріг у 100 треків робить порівняння жанрів більш стабільним і репрезентативним.
 
 **-Частина 4 — Індекси та оптимізація**
+4.1
 1.До створення індексу MongoDB виконувала запит через повне сканування колекції — COLLSCAN
 Після створення compound index з’явився IXSCAN в winningPlan.
 Також змінилися ключові показники executionStats:
@@ -306,7 +308,151 @@ totalKeysExamined: 412,
 nReturned: 354,
 executionTimeMillis: 3
 }
+4.2
+==========================================
+Завдання 2. Індекс для інших полів
+==========================================
 
+Запит для пошуку музики для роботи:
+{
+'audio_features.instrumentalness': {
+'$gt': 0.5
+  },
+  'audio_features.speechiness': {
+    '$lt': 0.1
+},
+explicit: false
+}
+
+Поточні індекси перед очищенням:
+[
+{
+v: 2,
+key: {
+_id: 1
+},
+name: '_id_'
+},
+{
+v: 2,
+key: {
+explicit: 1,
+'audio_features.instrumentalness': 1,
+'audio_features.speechiness': 1
+},
+name: 'idx_work_music'
+}
+]
+
+Видаляємо всі індекси, крім \_id:
+
+Індекси після очищення:
+[
+{
+v: 2,
+key: {
+_id: 1
+},
+name: '_id_'
+}
+]
+
+--- Explain без індексу ---
+{
+winningPlan: {
+isCached: false,
+stage: 'COLLSCAN',
+filter: {
+'$and': [
+        {
+          explicit: {
+            '$eq': false
+}
+},
+{
+'audio_features.speechiness': {
+'$lt': 0.1
+          }
+        },
+        {
+          'audio_features.instrumentalness': {
+            '$gt': 0.5
+}
+}
+]
+},
+direction: 'forward'
+},
+totalDocsExamined: 113999,
+totalKeysExamined: 0,
+nReturned: 16141,
+executionTimeMillis: 164
+}
+
+Створюємо compound index для музики для роботи:
+
+Індекси після створення:
+[
+{
+v: 2,
+key: {
+_id: 1
+},
+name: '_id_'
+},
+{
+v: 2,
+key: {
+explicit: 1,
+'audio_features.instrumentalness': 1,
+'audio_features.speechiness': 1
+},
+name: 'idx_work_music'
+}
+]
+
+--- Explain після створення індексу ---
+{
+winningPlan: {
+isCached: false,
+stage: 'FETCH',
+inputStage: {
+stage: 'IXSCAN',
+keyPattern: {
+explicit: 1,
+'audio_features.instrumentalness': 1,
+'audio_features.speechiness': 1
+},
+indexName: 'idx_work_music',
+isMultiKey: false,
+multiKeyPaths: {
+explicit: [],
+'audio_features.instrumentalness': [],
+'audio_features.speechiness': []
+},
+isUnique: false,
+isSparse: false,
+isPartial: false,
+indexVersion: 2,
+direction: 'forward',
+indexBounds: {
+explicit: [
+'[false, false]'
+],
+'audio_features.instrumentalness': [
+'(0.5, inf.0]'
+],
+'audio_features.speechiness': [
+'[-inf.0, 0.1)'
+]
+}
+}
+},
+totalDocsExamined: 16141,
+totalKeysExamined: 16602,
+nReturned: 16141,
+executionTimeMillis: 60
+}
 Завдання 3. Покривний запит
 Він не є покривним запитом (covered query), тому що за замовчуванням MongoDB повертає всі поля документа, включно з `_id`. Створений індекс містить лише поля `track_genre`, `popularity` та `audio_features.danceability`, але не містить усіх полів документа.
 
