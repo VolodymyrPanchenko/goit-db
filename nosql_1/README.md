@@ -1,3 +1,119 @@
+## Налаштування оточення та запуск проєкту
+
+### 1. Клонування / відкриття проєкту
+
+Спочатку потрібно відкрити папку проєкту у VS Code або перейти в неї через термінал:
+
+cd musicmongotask
+
+### 2. Створення віртуального оточення
+
+python -m venv .venv
+
+Активація на Windows:
+
+.venv\Scripts\activate
+
+### 3. Встановлення залежностей
+
+pip install -r requirements.txt
+
+Файл `requirements.txt` містить необхідні Python-залежності, зокрема `pymongo`, `pandas`, `python-dotenv`, `tqdm`.
+
+### 4. Налаштування `.env`
+
+У корені проєкту потрібно створити файл `.env` і додати MongoDB Atlas connection string:
+
+MONGO_URI=mongodb+srv://USERNAME:PASSWORD@cluster0.xxxxx.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0
+
+Значення `USERNAME`, `PASSWORD` та адресу кластера потрібно замінити на власні дані з MongoDB Atlas.
+
+### 5. Завантаження сирих даних
+
+Файл `dataset.csv` має бути розміщений у корені проєкту.
+
+Після цього потрібно запустити скрипт завантаження даних:
+
+python scripts/load_data.py
+
+Скрипт створює базу `spotify` і завантажує сирі дані в колекцію `tracks_raw`.
+
+### 6. Трансформація даних
+
+Після завантаження сирих даних потрібно виконати трансформацію:
+
+mongosh "ВАШ_MONGO_URI" --file scripts/02_transform.js
+
+Цей скрипт створює колекцію `tracks` на основі `tracks_raw`, формує масив `artists`, вкладений об’єкт `audio_features`, поле `duration_sec` та `popularity_tier`.
+
+### 7. Запуск запитів
+
+Для виконання запитів до трансформованої колекції:
+
+mongosh "ВАШ_MONGO_URI" --file queries/part2_queries.js
+
+### 8. Аналіз індексів
+
+Для виконання завдань з індексації:
+
+mongosh "ВАШ_MONGO_URI" --file part4_indexes.js
+
+Скрипт виконує `explain()` до створення індексів, створює compound indexes і повторно виконує `explain()` для порівняння планів виконання.
+
+## Схема даних
+
+Після трансформації дані зберігаються в колекції `tracks` бази `spotify`. Кожен документ описує один музичний трек.
+
+Підсумкова структура документа:
+
+- `track_id` — ідентифікатор треку
+- `track_name` — назва треку
+- `album_name` — назва альбому
+- `artists` — масив виконавців
+- `explicit` — ознака explicit-контенту
+- `popularity` — популярність треку
+- `duration_ms` — тривалість у мілісекундах
+- `duration_sec` — тривалість у секундах
+- `track_genre` — жанр треку
+- `popularity_tier` — категорія популярності: `high`, `medium`, `low`
+- `audio_features` — вкладений об’єкт з аудіо-характеристиками треку
+
+Приклад документа:
+
+{
+"\_id": ObjectId("6a3d08389bbdcc89d1640d5b"),
+"track_id": "6Vc5wAMmXdKIAM7WUoEb7N",
+"track_name": "Say Something",
+"album_name": "Is There Anybody Out There?",
+"artists": [
+"A Great Big World",
+"Christina Aguilera"
+],
+"explicit": false,
+"popularity": 74,
+"duration_ms": 229400,
+"duration_sec": 229.4,
+"track_genre": "acoustic",
+"popularity_tier": "high",
+"audio_features": {
+"danceability": 0.407,
+"energy": 0.147,
+"loudness": -8.822,
+"speechiness": 0.0355,
+"acousticness": 0.857,
+"instrumentalness": 0.00000289,
+"liveness": 0.0913,
+"valence": 0.0765,
+"tempo": 141.284,
+"key": 2,
+"mode": 1,
+"time_signature": 3
+}
+}
+
+У фінальній схемі артисти зберігаються як масив, а аудіо-характеристики згруповані у вкладений об’єкт `audio_features`. Це робить документ більш структурованим і зручним для запитів.
+
+** Теоритичні питання **
 **-Частина 1 — Завантаження даних та проєктування схеми**
 
 1)Аудіо-характеристики винесені в окремий об’єкт audio_features, тому що вони логічно належать до однієї групи властивостей треку. Це робить структуру документа більш структурованою: загальна інформація про трек зберігається окремо від його технічних аудіо-параметрів.
