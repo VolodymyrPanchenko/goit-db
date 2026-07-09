@@ -1,7 +1,5 @@
 arxiv-metadata-oai-snapshot.json
 arxiv.zip
-data/arxiv_subset.parquet
-embeddings/embeddings.npy
 .env
 .venv/
 __pycache__/
